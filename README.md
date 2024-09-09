@@ -1,4 +1,4 @@
-# automatic badminton labeling
+# Automatic badminton labeling
 
 ## Aim
 
