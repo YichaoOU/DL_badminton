@@ -12,7 +12,7 @@ openpose_executable = 'E:\\TensorFlow\\openpose-1.7.0-binaries-win64-gpu-python3
 
 # Glob to get a list of all video files (change the file extension as needed)
 video_list = glob.glob(os.path.join(video_folder, 'IMG*.MOV'))  # Change extension if needed
-video_list = glob.glob(os.path.join(video_folder, 'smash.mp4'))  # Change extension if needed
+# video_list = glob.glob(os.path.join(video_folder, 'smash.mp4'))  # Change extension if needed
 
 # Function to run OpenPose on a video file and save JSON output
 def run_openpose(video_path, output_json_folder):
