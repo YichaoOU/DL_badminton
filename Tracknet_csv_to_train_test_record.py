@@ -34,7 +34,7 @@ def create_tf_example(image, image_filename, x, y, img_width, img_height, width=
     return tf_example
 
 # Function to draw bounding boxes on images
-def draw_bounding_box(image, x, y, img_width, img_height, width=50, height=50):
+def draw_bounding_box(image, x, y, img_width, img_height, width=20, height=20):
     # Calculate bounding box coordinates
     xmin = int(x - width / 2)
     ymin = int(y - height / 2)
@@ -57,9 +57,10 @@ def write_tfrecord(output_path, data):
     writer.close()
 
 # Main function to generate train and test TFRecord from video and CSV
-def main(video_path, csv_path, output_train_record, output_test_record):
+def main(video_path, csv_path, output_train_record, output_test_record,show):
     # Load the CSV with object x, y coordinates and frame numbers
     df = pd.read_csv(csv_path)
+    df.columns = ['Frame','Ball','x','y']
     df = df[df.Ball==1]  # Filter rows where the object (ball) is present
     
     # Split the data into train and test sets
@@ -89,24 +90,27 @@ def main(video_path, csv_path, output_train_record, output_test_record):
         # print (current_frame,frame_rows)
         for _, row in frame_rows.iterrows():
             x, y = row['x'], row['y']
-            x = int(x*img_width)
-            y = int(y*img_height)
+            # V2 is int, actual size, # V3 is float
+            if x<1:
+                x = int(x*img_width)
+                y = int(y*img_height)
             frame_filename = f"frame_{current_frame}.jpg"
             
-            # Highlight the object on the image
-            # highlighted_frame = draw_bounding_box(frame, x, y, img_width, img_height)
-            
-            # Show the frame with the bounding box
-            # cv2.imshow('Object Detection', highlighted_frame)
-            
-            # Press any key to proceed to the next frame, 'q' to quit
-            # if cv2.waitKey(1) & 0xFF == ord('q'):
-            #     cap.release()
-            #     cv2.destroyAllWindows()
-            #     return
-            # Press any key to proceed to the next frame, 'q' to quit
-            # if cv2.waitKey(0) & 0xFF == ord(' '):
-            #     print ("")          
+            if show:
+                # Highlight the object on the image
+                highlighted_frame = draw_bounding_box(frame, x, y, img_width, img_height)
+                
+                # Show the frame with the bounding box
+                cv2.imshow('Object Detection', highlighted_frame)
+                
+                # Press any key to proceed to the next frame, 'q' to quit
+                if cv2.waitKey(0) & 0xFF == ord('q'):
+                    cap.release()
+                    cv2.destroyAllWindows()
+                    return
+                # Press any key to proceed to the next frame, 'q' to quit
+                if cv2.waitKey(0) & 0xFF == ord(' '):
+                    pass          
             # Add the frame data for TFRecord writing
             frame_data.append((frame, frame_filename, x, y, img_width, img_height))
 
@@ -125,20 +129,39 @@ def main(video_path, csv_path, output_train_record, output_test_record):
     # print (train_data)
     # print (train_df)
     # Write train and test data to TFRecord files
-    write_tfrecord(output_train_record, train_data)
-    write_tfrecord(output_test_record, test_data)
+    if not show:
+        write_tfrecord(output_train_record, train_data)
+        write_tfrecord(output_test_record, test_data)
 
-    print(f"TFRecord files created: {output_train_record}, {output_test_record}")
+        print(f"TFRecord files created: {output_train_record}, {output_test_record}")
 import glob
+# set to True when checking the box accuracy
+# Show=False
+Show=True
 if __name__ == "__main__":
-    files = glob.glob("*mp4")
-    for f in files:
-        print (f)
-        label = os.path.basename(f).split('.')[0] 
-        # label = "00001"
-        video_path = f'{label}.mp4'  # Path to your video file
-        csv_path = f'{label}.csv'   # Path to your labeled CSV file
+    files = glob.glob("D:\\Badminton\\2024\\2024-9-7\\IMG_9417.MOV",recursive=False)
+    # files = glob.glob("E:\\badminton\\TrackNetV2\\TrackNetV2\\**\\*mp4",recursive=True)+glob.glob("E:\\badminton\\TrackNetV3\\**\\*mp4",recursive=False) # for tracknet data
+    count = 0
+    print (files)
+    for video_file in files:
+        
+        label = os.path.basename(video_file).split('.')[0] 
+        print (label)
+        csv_path = video_file.replace(".mp4",".csv").replace(".MOV",".csv")
+        # V2 csv and video are in different folder
+        if not os.path.isfile(csv_path):
+            csv_path = video_file.replace(".mp4","_ball.csv")
+            csv_path = csv_path.replace("video","csv")
+            if not os.path.isfile(csv_path):
+                print (f"Still not found {csv_path}")
+                exit()
+        # output to current folder
         output_train_record = f'{label}.train.record'
         output_test_record = f'{label}.test.record'
-
-        main(video_path, csv_path, output_train_record, output_test_record)
+        # in case tracknet dataset has the same video name
+        if os.path.isfile(output_train_record):
+            label = label+f"_{count}"
+            output_train_record = f'{label}.train.record'
+            output_test_record = f'{label}.test.record'
+        main(video_file, csv_path, output_train_record, output_test_record,Show)
+        count += 1

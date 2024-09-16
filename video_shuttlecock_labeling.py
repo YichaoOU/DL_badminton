@@ -17,7 +17,7 @@ def click_event(event, x, y, flags, params):
         clicked_positions.append((x, y))
 
 # Function to convert coordinates to bounding boxes and create TFExample
-def create_tf_example(image, image_filename, label, center_x, center_y, img_width, img_height, width=25, height=25):
+def create_tf_example(image, image_filename, center_x, center_y, img_width, img_height, width=30, height=30):
     xmin = (center_x - width / 2) / img_width
     ymin = (center_y - height / 2) / img_height
     xmax = (center_x + width / 2) / img_width
@@ -37,7 +37,7 @@ def create_tf_example(image, image_filename, label, center_x, center_y, img_widt
         'image/object/bbox/ymin': dataset_util.float_list_feature([ymin]),
         'image/object/bbox/xmax': dataset_util.float_list_feature([xmax]),
         'image/object/bbox/ymax': dataset_util.float_list_feature([ymax]),
-        'image/object/class/text': dataset_util.bytes_feature(label.encode('utf8')),
+        'image/object/class/text': dataset_util.bytes_feature("ball".encode('utf8')),
         'image/object/class/label': dataset_util.int64_list_feature([1])  # Assuming label is always 'object' (label 1)
     }))
     
@@ -47,21 +47,21 @@ def create_tf_example(image, image_filename, label, center_x, center_y, img_widt
 def write_tfrecord(output_path, data):
     writer = tf.io.TFRecordWriter(output_path)
 
-    for image, filename, label, (x, y), img_width, img_height in data:
-        tf_example = create_tf_example(image, filename, label, x, y, img_width, img_height)
+    for image, filename, (x, y), img_width, img_height in data:
+        tf_example = create_tf_example(image, filename, x, y, img_width, img_height)
         writer.write(tf_example.SerializeToString())
 
     writer.close()
 
 # Function to process video frames and generate TFRecord
-def main(video_path, output_train_record, output_test_record, label_map):
+def main(video_path, output_train_record, output_test_record, output_csv):
     global clicked_positions
 
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
         print("Error: Could not open video.")
         return
-
+    df = [] 
     current_frame = 0
     while True:
         ret, frame = cap.read()
@@ -77,29 +77,41 @@ def main(video_path, output_train_record, output_test_record, label_map):
 
         if key == ord('q'):
             break
+        elif key == ord('+'):
+            
+            for i in range(10):
+                cap.read()
+            current_frame+=11
+            clicked_positions = []
         elif key == ord(' '):
             if len(clicked_positions) > 0:
                 for pos in clicked_positions:
-                    frame_data.append((frame, frame_filename, label_map['object'], pos, img_width, img_height))
+                    print (pos)
+                    df.append([current_frame,1,pos[0],pos[1]])
+                    frame_data.append((frame, frame_filename, pos, img_width, img_height))
             clicked_positions = []
             current_frame += 1
-
+        else:
+            current_frame += 1
+            clicked_positions = []
     cap.release()
     cv2.destroyAllWindows()
 
     # Split the data into training and testing sets
     train_data, test_data = train_test_split(frame_data, test_size=0.2, random_state=42)
-
+    df = pd.DataFrame(df)
+    df.to_csv(output_csv,index=False)
     # Write the TFRecord files
     write_tfrecord(output_train_record, train_data)
     write_tfrecord(output_test_record, test_data)
 
     print(f"TFRecord files created: {output_train_record}, {output_test_record}")
-
+import sys
 if __name__ == "__main__":
     video_file = sys.argv[1]  # Path to your video file
     label = os.path.basename(video_file).split('.')[0] 
     output_train_record = f'{label}.train.record'
     output_test_record = f'{label}.test.record'
+    output_csv = f'{label}.csv'
 
-    main(video_file, output_train_record, output_test_record)
+    main(video_file, output_train_record, output_test_record,output_csv)
