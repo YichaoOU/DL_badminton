@@ -3,6 +3,7 @@ __pycache__/
 *.py[cod]
 *$py.class
 *record
+*MOV
 # C extensions
 *.so
 output_json_folder/
